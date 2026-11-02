@@ -23,6 +23,12 @@
   "button.keybindbundles.edit": "Edit",
   "button.keybindbundles.delete": "Delete",
 
+  "button.keybindbundles.paste_image": "Paste Image",
+  "button.keybindbundles.browse_items": "Browse Items",
+  "button.keybindbundles.clear_icon": "Clear",
+  "tooltip.keybindbundles.paste_image": "Paste image from clipboard (PNG, JPG, SVG, File path or URL)",
+  "tooltip.keybindbundles.browse_items": "View and choose an item visually from all game items",
+  "tooltip.keybindbundles.clear_icon": "Remove custom image or item icon",
   "tooltip.keybindbundles.delete_bundle": "Delete key bundle",
   "tooltip.keybindbundles.bundle.edit_entry": "Left click to edit entry",
   "tooltip.keybindbundles.bundle.delete_entry": "Shift Left Click to delete entry",

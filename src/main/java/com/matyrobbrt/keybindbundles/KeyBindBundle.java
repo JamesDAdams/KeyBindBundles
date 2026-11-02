@@ -59,11 +59,24 @@ public class KeyBindBundle {
         );
     }
 
-    public record KeyEntry(String key, String title, ItemStack icon) {
+    public record KeyEntry(String key, String title, ItemStack icon, String customIcon) {
         public static final Codec<KeyEntry> CODEC = RecordCodecBuilder.create(in -> in.group(
                 Codec.STRING.fieldOf("key").forGetter(KeyEntry::key),
                 Codec.STRING.fieldOf("title").forGetter(KeyEntry::title),
-                ItemStack.OPTIONAL_CODEC.lenientOptionalFieldOf("icon", ItemStack.EMPTY).forGetter(KeyEntry::icon)
+                ItemStack.OPTIONAL_CODEC.lenientOptionalFieldOf("icon", ItemStack.EMPTY).forGetter(KeyEntry::icon),
+                Codec.STRING.lenientOptionalFieldOf("customIcon", "").forGetter(KeyEntry::customIcon)
         ).apply(in, KeyEntry::new));
+
+        public KeyEntry(String key, String title, ItemStack icon) {
+            this(key, title, icon, "");
+        }
+
+        public KeyEntry(String key, String title) {
+            this(key, title, ItemStack.EMPTY, "");
+        }
+
+        public boolean hasCustomIcon() {
+            return customIcon != null && !customIcon.isBlank();
+        }
     }
 }

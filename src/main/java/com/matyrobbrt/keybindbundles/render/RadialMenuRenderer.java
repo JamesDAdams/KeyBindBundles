@@ -30,6 +30,9 @@ public abstract class RadialMenuRenderer<T> {
 
     public abstract Component getTitle(T entry);
     public abstract ItemStack getIcon(T entry);
+    public String getCustomIcon(T entry) {
+        return null;
+    }
 
     public boolean trackOffCircleMouse() {
         return true;
@@ -91,7 +94,14 @@ public abstract class RadialMenuRenderer<T> {
             float y = Mth.sin(angle) * RadialMenuRenderer.MIDDLE_DISTANCE;
 
             var icon = getIcon(key);
-            if (!icon.isEmpty()) {
+            String customIcon = getCustomIcon(key);
+            if (customIcon != null && !customIcon.isBlank()) {
+                textToDraw.add(new PositionedText(x, y, getTitle(key)));
+                var rl = CustomImageManager.getOrLoadTexture(customIcon);
+                if (rl != null) {
+                    guiGraphics.blit(rl, Math.round(x - 8), Math.round(y - 8 - 2 - 9), 0, 0, 16, 16, 16, 16);
+                }
+            } else if (!icon.isEmpty()) {
                 textToDraw.add(new PositionedText(x, y, getTitle(key)));
 
                 guiGraphics.renderItem(icon, Math.round(x - 8), Math.round(y - 8 - 2 - 9));

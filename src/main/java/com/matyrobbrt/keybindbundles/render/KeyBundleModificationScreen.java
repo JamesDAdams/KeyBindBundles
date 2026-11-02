@@ -66,6 +66,11 @@ public class KeyBundleModificationScreen extends Screen {
         }
 
         @Override
+        public String getCustomIcon(KeyBindBundle.KeyEntry entry) {
+            return entry.customIcon();
+        }
+
+        @Override
         public boolean trackOffCircleMouse() {
             return false;
         }
@@ -179,18 +184,28 @@ public class KeyBundleModificationScreen extends Screen {
 
         private EditBox title;
         private AutoCompleteEditBox<ItemStack> icon;
+        private String customIconFilename = "";
+        private ItemStack selectedItemFromPicker = null;
+        private String cachedTitle = null;
 
         @Override
         protected void init() {
             var font = Minecraft.getInstance().font;
-            middlePos = height / 2 - 20;
+            middlePos = height / 2 - 30;
+            if (selectedItemFromPicker != null) {
+                this.customIconFilename = "";
+            } else if (customIconFilename == null || customIconFilename.isBlank()) {
+                customIconFilename = getEntry().customIcon();
+                if (customIconFilename == null) customIconFilename = "";
+            }
+
             title = new EnterEditBox(font, width / 2 - 120, middlePos - 2 - 20, 240, 20, Component.translatable("box.keybindbundles.key_title")) {
                 @Override
                 protected void onEnter() {
                     EditKeyScreen.this.setFocused(icon);
                 }
             };
-            title.setValue(getEntry().title());
+            title.setValue(cachedTitle != null ? cachedTitle : getEntry().title());
 
             SearchTree<ItemStack> tree = SearchTreeManager.getSearchTree();
             icon = new AutoCompleteEditBox<>(font, width / 2 - 120, middlePos + 2 + 9 + 2, 240, 20, 16, 18, 5, Component.translatable("box.keybindbundles.key_icon_id"), tree, i -> i.getItemHolder().getKey().location()) {
@@ -200,19 +215,64 @@ public class KeyBundleModificationScreen extends Screen {
                 }
             };
             icon.setMaxLength(512);
-            if (!getEntry().icon().isEmpty()) {
-                icon.setValue(getEntry().icon().getItemHolder().getRegisteredName());
+
+            if (selectedItemFromPicker != null && !selectedItemFromPicker.isEmpty()) {
+                icon.setValue(BuiltInRegistries.ITEM.getKey(selectedItemFromPicker.getItem()).toString());
+            } else if (!getEntry().icon().isEmpty()) {
+                icon.setValue(BuiltInRegistries.ITEM.getKey(getEntry().icon().getItem()).toString());
             }
 
             addRenderableWidget(title);
             addRenderableWidget(icon);
 
+            // Action Buttons under icon box: [Browse Items] [Paste Image] [Clear]
+            int btnY = middlePos + 2 + 9 + 2 + 24;
+            addRenderableWidget(new Button.Builder(Component.translatable("button.keybindbundles.browse_items"), b -> {
+                this.cachedTitle = this.title.getValue();
+                Minecraft.getInstance().setScreen(new ItemPickerScreen(this, itemStack -> {
+                    this.customIconFilename = "";
+                    this.selectedItemFromPicker = itemStack;
+                    ResourceLocation rl = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+                    if (rl != null) {
+                        this.icon.setValue(rl.toString());
+                    }
+                }));
+            }).pos(width / 2 - 120, btnY).size(78, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("tooltip.keybindbundles.browse_items"))).build());
+
+            addRenderableWidget(new Button.Builder(Component.translatable("button.keybindbundles.paste_image"), b -> {
+                pasteCustomImage();
+            }).pos(width / 2 - 38, btnY).size(76, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("tooltip.keybindbundles.paste_image"))).build());
+
+            addRenderableWidget(new Button.Builder(Component.translatable("button.keybindbundles.clear_icon"), b -> {
+                this.customIconFilename = "";
+                this.selectedItemFromPicker = null;
+                this.icon.setValue("");
+            }).pos(width / 2 + 42, btnY).size(78, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("tooltip.keybindbundles.clear_icon"))).build());
+
             addRenderableWidget(new Button.Builder(CommonComponents.GUI_DONE, p -> onClose())
-                    .pos(width / 2 - 240 / 2, icon.autoComplete().getY() + icon.autoComplete().getHeight() + 10)
+                    .pos(width / 2 - 240 / 2, btnY + 26)
                     .size(240, 20)
                     .build());
 
             addRenderableWidget(icon.autoComplete());
+        }
+
+        private void pasteCustomImage() {
+            String registeredFilename = ImageClipboardHelper.tryPasteImage();
+            if (registeredFilename != null) {
+                this.customIconFilename = registeredFilename;
+                this.selectedItemFromPicker = null;
+                this.icon.setValue("");
+            }
+        }
+
+        @Override
+        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+            if (Screen.isPaste(keyCode) && !this.title.isFocused() && !this.icon.isFocused()) {
+                pasteCustomImage();
+                return true;
+            }
+            return super.keyPressed(keyCode, scanCode, modifiers);
         }
 
         @Override
@@ -225,15 +285,26 @@ public class KeyBundleModificationScreen extends Screen {
             var title = Component.translatable("box.keybindbundles.key_title");
             guiGraphics.drawString(Minecraft.getInstance().font, title, width / 2 - font.width(title) / 2, middlePos - 2 - 20 - 2 - 9, 0xffffffff);
 
-            var icon = Component.translatable("box.keybindbundles.key_icon");
-            guiGraphics.drawString(Minecraft.getInstance().font, icon, width / 2 - font.width(icon) / 2, middlePos + 2, 0xffffffff);
+            var iconLabel = Component.translatable("box.keybindbundles.key_icon");
+            guiGraphics.drawString(Minecraft.getInstance().font, iconLabel, width / 2 - font.width(iconLabel) / 2, middlePos + 2, 0xffffffff);
 
-            if (!this.icon.getValue().isEmpty()) {
+            int previewX = this.icon.getX() + this.icon.getWidth() + 4;
+            int previewY = middlePos + 1 + 9 + 2 + (20 - 16) / 2;
+
+            if (customIconFilename != null && !customIconFilename.isBlank()) {
+                var rl = CustomImageManager.getOrLoadTexture(customIconFilename);
+                if (rl != null) {
+                    guiGraphics.blit(rl, previewX, previewY, 0, 0, 16, 16, 16, 16);
+                }
+            } else if (selectedItemFromPicker != null && !selectedItemFromPicker.isEmpty()) {
+                guiGraphics.renderItem(selectedItemFromPicker, previewX, previewY);
+            } else if (!this.icon.getValue().isEmpty()) {
                 var parsed = ResourceLocation.tryParse(this.icon.getValue());
-                if (parsed == null) return;
-                var item = BuiltInRegistries.ITEM.get(parsed);
-                if (item != Items.AIR) {
-                    guiGraphics.renderItem(item.getDefaultInstance(), this.icon.getX() + this.icon.getWidth() + 2, middlePos + 1 + 9 + 2 + (20 - 16) / 2);
+                if (parsed != null) {
+                    var item = BuiltInRegistries.ITEM.get(parsed);
+                    if (item != Items.AIR) {
+                        guiGraphics.renderItem(item.getDefaultInstance(), previewX, previewY);
+                    }
                 }
             }
         }
@@ -241,9 +312,22 @@ public class KeyBundleModificationScreen extends Screen {
         @Override
         public void onClose() {
             var old = getEntry();
-            var parsed = ResourceLocation.tryParse(this.icon.getValue());
-            var newEntry = new KeyBindBundle.KeyEntry(old.key(), title.getValue(),
-                    parsed == null ? ItemStack.EMPTY : BuiltInRegistries.ITEM.get(parsed).getDefaultInstance());
+            ItemStack iconStack = ItemStack.EMPTY;
+            if (customIconFilename.isBlank()) {
+                if (selectedItemFromPicker != null && !selectedItemFromPicker.isEmpty()) {
+                    iconStack = selectedItemFromPicker;
+                } else if (!this.icon.getValue().isEmpty()) {
+                    var parsed = ResourceLocation.tryParse(this.icon.getValue());
+                    if (parsed != null) {
+                        var item = BuiltInRegistries.ITEM.get(parsed);
+                        if (item != Items.AIR) {
+                            iconStack = item.getDefaultInstance();
+                        }
+                    }
+                }
+            }
+
+            var newEntry = new KeyBindBundle.KeyEntry(old.key(), title.getValue(), iconStack, customIconFilename);
             entries.set(key, newEntry);
             bundle.getEntries().set(key, newEntry);
 

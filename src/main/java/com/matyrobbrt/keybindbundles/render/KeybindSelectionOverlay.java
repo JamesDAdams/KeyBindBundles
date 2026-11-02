@@ -38,6 +38,11 @@ public class KeybindSelectionOverlay extends RadialMenuRenderer<KeyBindBundle.Ke
     }
 
     @Override
+    public String getCustomIcon(KeyBindBundle.KeyEntry entry) {
+        return entry.customIcon();
+    }
+
+    @Override
     public List<KeyBindBundle.KeyEntry> getEntries() {
         return displayedKeybind == null ? List.of() : displayedKeybind.getEntries();
     }
